@@ -78,21 +78,17 @@ function approvalStep(item: DerivedCase): Step {
 }
 
 function stockStep(item: DerivedCase): Step {
-  const base = { key: "stock" as const, title: "Verify stock", icon: "cube" as IconName };
+  const base = { key: "stock" as const, title: "Verify stock", detail: "", icon: "cube" as IconName };
   if (item.blocked || item.noAction || item.runtime.rejected || !item.runtime.approved) {
-    return { ...base, detail: "Locked until the proposal is approved.", state: "locked" };
+    return { ...base, state: "locked" };
   }
   if (!item.stock) {
-    return { ...base, detail: "No matching stock record.", state: "skipped" };
+    return { ...base, state: "skipped" };
   }
   if (item.stock.confirmed) {
-    return { ...base, detail: `${item.stock.units} units confirmed.`, state: "done" };
+    return { ...base, state: "done" };
   }
-  return {
-    ...base,
-    detail: `${item.stock.units} reported — confirmation pending.`,
-    state: "active",
-  };
+  return { ...base, state: "active" };
 }
 
 function contactStep(item: DerivedCase): Step {
@@ -106,7 +102,7 @@ function contactStep(item: DerivedCase): Step {
   if (item.runtime.messageSimulated) {
     return { ...base, detail: "Customer message generated (simulated).", state: "done" };
   }
-  return { ...base, detail: "Ready to contact the customer.", state: "active" };
+  return { ...base, detail: "", state: "active" };
 }
 
 type Props = {
@@ -128,7 +124,7 @@ export function ValidationTimeline({ item, approve, stock, contact }: Props) {
       </h2>
       <ol className="v-timeline">
         {steps.map((step) => (
-          <li key={step.key} className={`vstep is-${step.state}`}>
+          <li key={step.key} className={`vstep vstep-${step.key} is-${step.state}`}>
             <span className="vstep-ball" aria-hidden="true">
               <Icon name={ballIcon(step)} size={18} />
             </span>
@@ -136,7 +132,7 @@ export function ValidationTimeline({ item, approve, stock, contact }: Props) {
               <header className="vstep-head">
                 <span className="vstep-heading">
                   <span className="vstep-title">{step.title}</span>
-                  <span className="vstep-detail">{step.detail}</span>
+                  {step.detail ? <span className="vstep-detail">{step.detail}</span> : null}
                 </span>
                 <span className={`vstep-status is-${step.state}`}>
                   {STATUS_LABEL[step.state]}

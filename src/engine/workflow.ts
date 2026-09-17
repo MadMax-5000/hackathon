@@ -1,6 +1,7 @@
 import type {
   Availability,
   CaseRuntime,
+  CaseTask,
   CustomerContact,
   DerivedCase,
   HistoryEvent,
@@ -462,6 +463,27 @@ export function groupCases(cases: DerivedCase[]): QueueGroupView[] {
     group,
     cases: cases.filter((item) => item.queueGroup === group),
   })).filter((entry) => entry.cases.length > 0);
+}
+
+export function deriveTasks(cases: DerivedCase[]): CaseTask[] {
+  return cases
+    .filter((item) => item.runtime.task)
+    .map((item) => ({
+      case: item,
+      note: item.runtime.task!.note,
+      createdAt: item.runtime.task!.createdAt,
+    }))
+    .sort((a, b) => b.createdAt - a.createdAt || a.case.wheel.id.localeCompare(b.case.wheel.id));
+}
+
+export function casesNeedingTask(cases: DerivedCase[]): DerivedCase[] {
+  return cases.filter((item) => item.blocked && !item.runtime.task);
+}
+
+export function casesNeedingAttention(cases: DerivedCase[]): DerivedCase[] {
+  return cases.filter(
+    (item) => item.queueGroup !== "Complete" && item.queueGroup !== "No action required",
+  );
 }
 
 const INSIGHT_RANK: Record<InsightTone, number> = {

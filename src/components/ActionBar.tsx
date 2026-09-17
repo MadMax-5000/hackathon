@@ -95,7 +95,6 @@ export function ActionBar({
           <Icon name="redo" size={18} />
           Back to review
         </button>
-        <span className="action-hint sim">SIMULATED — not a live inventory system.</span>
       </div>
     );
   }

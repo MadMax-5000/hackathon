@@ -78,6 +78,24 @@ DEEPSEEK_MODEL=deepseek-v4-flash
 
 The proxy runs with `npm run dev` and `npm run preview`.
 
+## Insights (synthetic historical analytics)
+
+A **separate analytics surface**, reached from the sidebar, that demonstrates how the system could learn from historical workflow data. It is an add-on layer: the Inspection → Offer workflow, its rules, `initial.json`, and the database are untouched.
+
+Every screen carries the label **“SYNTHETIC HISTORICAL DATA — GENERATED FOR DEMONSTRATION.”** The analytics dataset is generated and never mixed with the live C03 case state.
+
+- **Synthetic dataset** — `src/insights/synthetic.ts` generates 3,000 realistic-looking historical records from a fixed seed (mulberry32). Records use a `HIST-#####` namespace only; the module never imports `initial.json` and contains no real customer identities or contact values.
+- **Delay-risk classifier** — an explainable logistic regression (`src/insights/model.ts`) predicts “high likelihood of workflow delay” from features such as measurement completeness, stock confirmation, contact availability, technician corrections, and appointment lead time. It reports a calibrated probability, a label, the top contributing factors for the selected record, global `|weight|` importance, and held-out accuracy / precision / recall / AUC.
+- **Clustering** — seeded k-means (`src/insights/clustering.ts`) groups the history into workflow patterns. Cluster descriptions are derived from measured feature deviations against the global profile, not hardcoded.
+- **Anomaly detection** — z-score detection (`src/insights/anomaly.ts`) flags unusually long inspection→offer times, contact lag, and delay.
+- **Descriptive analytics** — average time to offer, average time to contact, approval / rejection rates, missing-evidence rate, and stock-delay rate.
+- **Visuals** — offer-outcome donut, workflow-cluster donut, appointment-lead-time trend line, issue-type ranking, offer-vs-contact scatter, time-to-offer histogram, evidence/stock comparison tiles, and an AUC gauge. Inline SVG only; no chart library and no gradients.
+- **Insight cards** — associations computed from the dataset, with the wording generated from the measured numbers. Each card offers **Explain**, **View supporting cases**, and (where a queue mapping exists) **View affected workflow cases**, which returns to the operational work queue focused on the relevant group.
+- **AI explanation and “Ask Insights AI”** — both use the existing `/api/copilot` proxy with a strict synthetic-data prompt. A guardrail rejects any reply whose numbers are not present in the computed evidence, and rejects causation or real-data claims. If the model is unavailable or the reply is rejected, a deterministic grounded explanation is used. Every explanation distinguishes observation, evidence, operational meaning, next step, and limitation.
+- **Caching** — `src/insights/analytics.ts` builds and trains once per session (module singleton); it never retrains on render. If analytics cannot be produced, the page shows a failure state and the operational workflow is unaffected.
+
+These statistics are synthetic demonstration values. They are **not** real dealership performance, and the models are **not** trained on real data. Association is never presented as causation.
+
 ## How to run
 
 Requires Node.js 22.20 or newer (uses the built-in `node:sqlite` module and TypeScript type stripping).
@@ -98,7 +116,9 @@ npm run verify
 
 ## Synthetic data
 
-All inspection and stock records come from `initial.json` / `src/data/initial.json`. Status in that file: synthetic exercise data; not real client, country, programme, or participant data. Identifiers are `TY-*` and `CUS-*` only. Customer contact values are synthetic (`server/seed/customers.json`) using reserved `example.invalid` addresses and `555` numbers.
+All **operational** inspection and stock records come from `initial.json` / `src/data/initial.json`. Status in that file: synthetic exercise data; not real client, country, programme, or participant data. Identifiers are `TY-*` and `CUS-*` only. Customer contact values are synthetic (`server/seed/customers.json`) using reserved `example.invalid` addresses and `555` numbers.
+
+The **Insights** page is separate: it uses an independently generated synthetic historical dataset with `HIST-*` identifiers and never reads or writes the operational records above.
 
 ## Simulated components
 
@@ -113,6 +133,9 @@ All inspection and stock records come from `initial.json` / `src/data/initial.js
 | Customer message / channel drafts | SIMULATED. Never sent |
 | Workshop, inventory, CRM, messaging APIs | Not connected |
 | Prices, appointments, safety judgment | Not real. No prices, supplier orders, diagnoses, or confirmed bookings are invented |
+| Insights historical dataset | Synthetic, generated deterministically at runtime (`HIST-*` ids only). Never mixed with live C03 cases |
+| Insights models | Simple explainable models (logistic regression, k-means, z-score anomalies) trained once per session on the synthetic dataset |
+| Insights AI explanations | DeepSeek via the same local proxy, constrained by a synthetic-data prompt + numeric-grounding guardrail; deterministic grounded fallback |
 
 UI labels: `SYNTHETIC DATA`, `SIMULATED STOCK EVENT`, `SIMULATED` / `NOT SENT`, `SIMULATED INTEGRATION`, `AI`.
 
@@ -129,7 +152,7 @@ UI labels: `SYNTHETIC DATA`, `SIMULATED STOCK EVENT`, `SIMULATED` / `NOT SENT`, 
 
 ## Automated verification
 
-`npm run verify` runs eleven suites. The first seven cover the pure engine and copilot modules; the last four use an isolated temporary SQLite database per suite.
+`npm run verify` runs twelve suites. The first eight cover the pure engine, copilot, and analytics modules; the last four use an isolated temporary SQLite database per suite.
 
 - `verify-isolation.mjs` — per-case state isolation, happy path, reset.
 - `verify-copilot.mjs` — deterministic grounding, no cross-case leakage, no fabricated content.
@@ -142,6 +165,7 @@ UI labels: `SYNTHETIC DATA`, `SIMULATED STOCK EVENT`, `SIMULATED` / `NOT SENT`, 
 - `verify-contacts.mjs` — channel reads, missing contact stays missing, no fabricated channels.
 - `verify-contact-gating.mjs` — no contact before approval, none while stock pending, none for blocked cases, case isolation.
 - `verify-audit.mjs` — stock simulation, message simulation, and approval each create persisted events/audit records.
+- `verify-insights.mjs` — deterministic dataset generation, model input/output shape, insight recomputation, cluster/anomaly output, no mixing with `initial.json`, AI explanation grounding (hallucinated numbers and causation claims rejected), graceful failure when analytics are unavailable, and one-time caching.
 
 The tests never call DeepSeek (injected fake `fetch`) and never touch the demo database (temporary file per suite).
 
@@ -151,6 +175,7 @@ The tests never call DeepSeek (injected fake `fetch`) and never touch the demo d
 - Quantity proposal is a flag count, not a fitment decision.
 - Contact actions generate a draft in a simulated outbox only; no message, call, or email is ever sent.
 - The assistant is constrained to the current case snapshot; it is not an open-ended agent.
+- The Insights page is a demonstration analytics layer. Its dataset is synthetic and generated at runtime, its models are simple and explainable, and its statistics do not describe real dealership performance. It never reads or modifies the operational C03 cases.
 - The proxy and database API only run under `npm run dev` / `npm run preview`; a static hosting build has no server and no database.
 - Desktop-first layout, responsive down to narrow screens.
 

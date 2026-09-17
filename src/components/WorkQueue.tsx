@@ -5,8 +5,8 @@ import { Icon } from "./Icon";
 type Props = {
   groups: QueueGroupView[];
   selectedId: string;
+  focusGroups?: QueueGroup[];
   onSelect: (id: string) => void;
-  onReset: () => void;
 };
 
 const GROUP_TONE: Record<QueueGroup, string> = {
@@ -146,8 +146,12 @@ function QueueRow({
   );
 }
 
-export function WorkQueue({ groups, selectedId, onSelect, onReset }: Props) {
-  const [active, setActive] = useState<Set<QueueGroup>>(new Set());
+export function WorkQueue({ groups, selectedId, focusGroups, onSelect }: Props) {
+  const [active, setActive] = useState<Set<QueueGroup>>(() => new Set(focusGroups ?? []));
+
+  useEffect(() => {
+    if (focusGroups && focusGroups.length > 0) setActive(new Set(focusGroups));
+  }, [focusGroups]);
 
   const options: FilterOption[] = groups.map((entry) => ({
     group: entry.group,
@@ -185,15 +189,6 @@ export function WorkQueue({ groups, selectedId, onSelect, onReset }: Props) {
             onToggle={toggleGroup}
             onClear={() => setActive(new Set())}
           />
-          <button
-            type="button"
-            className="queue-icon-btn"
-            onClick={onReset}
-            aria-label="Reset demo"
-            title="Reset demo"
-          >
-            <Icon name="redo" size={18} />
-          </button>
         </div>
       </div>
 

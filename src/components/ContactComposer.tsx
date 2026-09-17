@@ -10,22 +10,79 @@ type Props = {
   message: ContactMessageRow | undefined;
   onGenerate: (body: string) => void;
   onMarkSimulated: () => void;
+  onSend: (body: string) => void | Promise<unknown>;
 };
 
-export function ContactComposer({ item, channel, message, onGenerate, onMarkSimulated }: Props) {
+const SEND_LABEL: Record<ContactChannel, string> = {
+  whatsapp: "Send WhatsApp now",
+  email: "Send email now",
+  phone: "",
+  sms: "Send SMS now",
+};
+
+export function ContactComposer({
+  item,
+  channel,
+  message,
+  onGenerate,
+  onMarkSimulated,
+  onSend,
+}: Props) {
   const initial = draftContactMessage(item, channel) ?? "";
   const [body, setBody] = useState(initial);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     setBody(draftContactMessage(item, channel) ?? "");
   }, [item.wheel.id, channel, item.runtime.quantity, item.runtime.size]);
 
-  const generated = message?.status === "draft" || message?.status === "marked_simulated";
+  const canAutoSend = channel !== "phone";
+  const isDraft = message?.status === "draft";
   const marked = message?.status === "marked_simulated";
+  const failed = message?.status === "send_failed";
+  const mockSent = message?.status === "mock_sent";
+  const deliveryLabel =
+    message?.status === "delivered"
+      ? "Delivered"
+      : message?.status === "bounced"
+        ? "Bounced"
+        : message?.status === "complained"
+          ? "Complained"
+          : message?.status === "delayed"
+            ? "Delivery delayed"
+            : null;
+  const sent =
+    message?.status === "sent" ||
+    mockSent ||
+    message?.status === "delivered" ||
+    deliveryLabel !== null;
+
+  const statusLabel = deliveryLabel
+    ? deliveryLabel
+    : mockSent
+      ? "Sent (mock)"
+      : message?.status === "sent"
+        ? "Sent automatically"
+        : failed
+          ? "Send failed"
+          : marked
+            ? "Marked simulated"
+            : isDraft
+              ? "Draft generated"
+              : "Not generated";
+
+  function handleSend() {
+    setSending(true);
+    Promise.resolve(onSend(body)).finally(() => setSending(false));
+  }
 
   return (
     <div className="contact-composer">
-      <p className="composer-title">SIMULATED {channelLabel(channel).toUpperCase()} MESSAGE</p>
+      <p className="composer-title">
+        {sent
+          ? `SENT ${channelLabel(channel).toUpperCase()} MESSAGE`
+          : `SIMULATED ${channelLabel(channel).toUpperCase()} MESSAGE`}
+      </p>
 
       <ul className="message-facts">
         <li>
@@ -44,7 +101,7 @@ export function ContactComposer({ item, channel, message, onGenerate, onMarkSimu
         </li>
         <li>
           <span>Status</span>
-          <strong>{marked ? "Marked simulated" : generated ? "Draft generated" : "Not generated"}</strong>
+          <strong>{statusLabel}</strong>
         </li>
       </ul>
 
@@ -54,11 +111,11 @@ export function ContactComposer({ item, channel, message, onGenerate, onMarkSimu
           value={body}
           onChange={(event) => setBody(event.target.value)}
           rows={3}
-          aria-label={`Simulated ${channelLabel(channel)} message draft`}
+          aria-label={`${channelLabel(channel)} message draft`}
         />
       </label>
 
-      <div className="action-row">
+      <div className="action-row is-centered">
         <button type="button" className="btn btn-primary" onClick={() => onGenerate(body)}>
           <Icon name="play" size={18} />
           Generate
@@ -67,17 +124,31 @@ export function ContactComposer({ item, channel, message, onGenerate, onMarkSimu
           type="button"
           className="btn"
           onClick={onMarkSimulated}
-          disabled={!generated || marked}
+          disabled={!isDraft || marked}
         >
           <Icon name="check" size={18} />
           Mark as simulated
         </button>
+        {canAutoSend ? (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleSend}
+            disabled={sending || sent}
+          >
+            <Icon name="arrow" size={18} />
+            {sending ? "Sending…" : sent ? "Sent" : SEND_LABEL[channel]}
+          </button>
+        ) : null}
       </div>
 
-      <p className="sim-note">
-        SIMULATED — NOT SENT. This prototype generates a draft only. No real customer is contacted and
-        no message leaves this workspace.
-      </p>
+      {canAutoSend ? (
+        <p className="contact-send-hint">
+          Sends automatically — email goes through Resend when configured, other channels use the
+          {" "}
+          mock provider. The manual hand-off links above still work.
+        </p>
+      ) : null}
     </div>
   );
 }

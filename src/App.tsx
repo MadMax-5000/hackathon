@@ -2,11 +2,31 @@ import { useEffect, useMemo, useState } from "react";
 import { CaseWorkspace } from "./components/CaseWorkspace";
 import { CopilotBubble } from "./components/CopilotBubble";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { HomeHeader } from "./components/HomeHeader";
+import { Icon } from "./components/Icon";
+import { Sidebar, type AppView } from "./components/Sidebar";
+import { TasksView } from "./components/TasksView";
+import { TimelineView } from "./components/TimelineView";
 import { WorkQueue } from "./components/WorkQueue";
+import { InsightsView } from "./components/insights/InsightsView";
 import { clearOverviewCache } from "./copilot/overviewCache";
 import { fetchState, resetDemo as resetDemoApi, runCommand, type Workspace } from "./data/api";
-import type { ContactChannel } from "./engine/types";
-import { deriveCase, findUrgentId, groupCases, sortCases } from "./engine/workflow";
+import type { ContactChannel, QueueGroup } from "./engine/types";
+import {
+  casesNeedingTask,
+  deriveCase,
+  deriveTasks,
+  findUrgentId,
+  groupCases,
+  sortCases,
+} from "./engine/workflow";
+
+const VIEW_TITLE: Record<AppView, string> = {
+  home: "Work queue",
+  timeline: "Timeline",
+  tasks: "Tasks",
+  insights: "Insights · synthetic data",
+};
 
 export default function App() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -14,7 +34,12 @@ export default function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<AppView>("home");
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    typeof window === "undefined" ? true : !window.matchMedia("(max-width: 860px)").matches,
+  );
   const [resetKey, setResetKey] = useState(0);
+  const [queueFocus, setQueueFocus] = useState<QueueGroup[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,6 +82,8 @@ export default function App() {
   }, [workspace, source, urgentId]);
 
   const groups = useMemo(() => groupCases(allCases), [allCases]);
+  const tasks = useMemo(() => deriveTasks(allCases), [allCases]);
+  const needsTask = useMemo(() => casesNeedingTask(allCases), [allCases]);
   const effectiveSelectedId =
     selectedId && allCases.some((item) => item.wheel.id === selectedId)
       ? selectedId
@@ -65,8 +92,10 @@ export default function App() {
 
   function run(promise: Promise<Workspace>) {
     setActionError(null);
-    promise
-      .then((state) => setWorkspace(state))
+    return promise
+      .then((state) => {
+        setWorkspace(state);
+      })
       .catch((error: unknown) => {
         setActionError(String(error instanceof Error ? error.message : error));
       });
@@ -84,6 +113,16 @@ export default function App() {
       .catch((error: unknown) => {
         setActionError(String(error instanceof Error ? error.message : error));
       });
+  }
+
+  function openCase(id: string) {
+    setSelectedId(id);
+    setView("home");
+  }
+
+  function openWorkflow(groups: QueueGroup[]) {
+    setQueueFocus(groups);
+    setView("home");
   }
 
   if (loading && !workspace) {
@@ -120,52 +159,116 @@ export default function App() {
     : [];
 
   return (
-    <div className="app">
-      <div className="workspace">
-        <aside className="queue-rail">
-          <WorkQueue
-            groups={groups}
-            selectedId={caseId}
-            onSelect={setSelectedId}
-            onReset={resetDemo}
-          />
-        </aside>
+    <div className="app-shell">
+      <div className={`shell ${sidebarOpen ? "is-open" : "is-collapsed"}`}>
+        <button
+          type="button"
+          className="sidebar-scrim"
+          aria-label="Close sidebar"
+          tabIndex={-1}
+          onClick={() => setSidebarOpen(false)}
+        />
+        <Sidebar
+          view={view}
+          taskCount={tasks.length}
+          onNavigate={setView}
+          onReset={resetDemo}
+        />
 
-        <main className="case-pane">
-          {actionError ? (
-            <p className="action-error" role="alert">
-              {actionError}
-            </p>
-          ) : null}
-          <ErrorBoundary onReset={resetDemo}>
-            <CaseWorkspace
-              key={`${resetKey}-${caseId}`}
-              item={selected}
-              rules={source.rules}
-              stockEvent={Boolean(workspace?.stockEvents[caseId])}
-              contactMessages={caseMessages}
-              onApprove={() => run(runCommand(`/api/cases/${caseId}/approve`))}
-              onReject={(reason) => run(runCommand(`/api/cases/${caseId}/reject`, { reason }))}
-              onSaveEdit={(quantity, size, note) =>
-                run(runCommand(`/api/cases/${caseId}/edit`, { quantity, size, note }))
-              }
-              onSimulateStock={() => run(runCommand(`/api/cases/${caseId}/stock/simulate`))}
-              onBackToReview={() => run(runCommand(`/api/cases/${caseId}/back-to-review`))}
-              onCreateReviewTask={(note) =>
-                run(runCommand(`/api/cases/${caseId}/review-task`, { note }))
-              }
-              onContactGenerate={(channel: ContactChannel, body: string) =>
-                run(runCommand(`/api/cases/${caseId}/contact/draft`, { channel, body }))
-              }
-              onContactMarkSimulated={(channel: ContactChannel) =>
-                run(runCommand(`/api/cases/${caseId}/contact/mark-simulated`, { channel }))
-              }
-            />
-          </ErrorBoundary>
-        </main>
+        <div className="shell-main">
+          <header className="shell-bar">
+            <button
+              type="button"
+              className="shell-toggle"
+              onClick={() => setSidebarOpen((value) => !value)}
+              aria-label={sidebarOpen ? "Collapse sidebar" : "Open sidebar"}
+              aria-expanded={sidebarOpen}
+              title={sidebarOpen ? "Collapse sidebar" : "Open sidebar"}
+            >
+              <Icon name={sidebarOpen ? "panel-open" : "panel-close"} size={20} />
+            </button>
+            <span className="shell-bar-title">{VIEW_TITLE[view]}</span>
+          </header>
+
+          <div className="shell-body">
+            {actionError ? (
+              <p className="action-error" role="alert">
+                {actionError}
+              </p>
+            ) : null}
+
+            {view === "insights" ? (
+              <InsightsView onOpenWorkflow={openWorkflow} />
+            ) : view === "tasks" ? (
+              <TasksView tasks={tasks} needsTask={needsTask} onOpenCase={openCase} />
+            ) : view === "timeline" ? (
+              <TimelineView item={selected} />
+            ) : (
+              <>
+                <HomeHeader cases={allCases} onOpenCase={openCase} />
+                <div className="workspace">
+                <aside className="queue-rail">
+                  <WorkQueue
+                    groups={groups}
+                    selectedId={caseId}
+                    focusGroups={queueFocus}
+                    onSelect={setSelectedId}
+                  />
+                </aside>
+
+                <main className="case-pane">
+                  <ErrorBoundary onReset={resetDemo}>
+                    <CaseWorkspace
+                      key={`${resetKey}-${caseId}`}
+                      item={selected}
+                      rules={source.rules}
+                      contactMessages={caseMessages}
+                      onApprove={() => run(runCommand(`/api/cases/${caseId}/approve`))}
+                      onReject={(reason) =>
+                        run(runCommand(`/api/cases/${caseId}/reject`, { reason }))
+                      }
+                      onSaveEdit={(quantity, size, note) =>
+                        run(runCommand(`/api/cases/${caseId}/edit`, { quantity, size, note }))
+                      }
+                      onSimulateStock={() =>
+                        run(runCommand(`/api/cases/${caseId}/stock/simulate`))
+                      }
+                      onBackToReview={() =>
+                        run(runCommand(`/api/cases/${caseId}/back-to-review`))
+                      }
+                      onCreateReviewTask={(note) =>
+                        run(runCommand(`/api/cases/${caseId}/review-task`, { note }))
+                      }
+                      onContactGenerate={(channel: ContactChannel, body: string) =>
+                        run(
+                          runCommand(`/api/cases/${caseId}/contact/draft`, { channel, body }),
+                        )
+                      }
+                      onContactMarkSimulated={(channel: ContactChannel) =>
+                        run(
+                          runCommand(`/api/cases/${caseId}/contact/mark-simulated`, {
+                            channel,
+                          }),
+                        )
+                      }
+                      onContactSend={(channel: ContactChannel, body: string) =>
+                        run(
+                          runCommand(`/api/cases/${caseId}/contact/send`, { channel, body }),
+                        )
+                      }
+                    />
+                  </ErrorBoundary>
+                </main>
+                </div>
+              </>
+            )}
+
+            {view === "home" || view === "timeline" ? (
+              <CopilotBubble item={selected} rules={source.rules} />
+            ) : null}
+          </div>
+        </div>
       </div>
-
-      <CopilotBubble item={selected} rules={source.rules} />
     </div>
   );
 }

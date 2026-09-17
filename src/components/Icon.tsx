@@ -2,6 +2,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import type { IconSvgElement } from "@hugeicons/react";
 import {
   Alert02Icon,
+  Analytics01Icon,
   ArrowDown01Icon,
   ArrowRight01Icon,
   Calendar03Icon,
@@ -14,6 +15,8 @@ import {
   Layers01Icon,
   LockIcon,
   Mail01Icon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
   PencilEdit02Icon,
   PlayCircleIcon,
   RefreshIcon,
@@ -44,16 +47,20 @@ export type IconName =
   | "arrow"
   | "sparkle"
   | "shield"
+  | "chart"
   | "layers"
   | "clipboard"
   | "search"
   | "send"
-  | "play";
+  | "play"
+  | "panel-open"
+  | "panel-close";
 
 type Props = {
   name: IconName;
   size?: number;
   className?: string;
+  strokeWidth?: number;
 };
 
 const ICONS: Record<Exclude<IconName, "tyre">, IconSvgElement> = {
@@ -74,14 +81,17 @@ const ICONS: Record<Exclude<IconName, "tyre">, IconSvgElement> = {
   arrow: ArrowRight01Icon,
   sparkle: SparklesIcon,
   shield: ShieldCheckIcon,
+  chart: Analytics01Icon,
   layers: Layers01Icon,
   clipboard: ClipboardIcon,
   search: Search01Icon,
   send: SentIcon,
   play: PlayCircleIcon,
+  "panel-open": PanelLeftOpenIcon,
+  "panel-close": PanelLeftCloseIcon,
 };
 
-export function Icon({ name, size = 20, className }: Props) {
+export function Icon({ name, size = 20, className, strokeWidth = 1.8 }: Props) {
   if (name === "tyre") {
     return (
       <svg
@@ -102,7 +112,7 @@ export function Icon({ name, size = 20, className }: Props) {
       icon={ICONS[name]}
       size={size}
       className={className}
-      strokeWidth={1.8}
+      strokeWidth={strokeWidth}
       aria-hidden="true"
     />
   );

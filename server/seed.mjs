@@ -1,9 +1,21 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { inTransaction, PROJECT_ROOT } from "./db.mjs";
 
-const INITIAL_PATH = resolve(PROJECT_ROOT, "initial.json");
-const CUSTOMERS_PATH = resolve(PROJECT_ROOT, "server", "seed", "customers.json");
+// resolve() against process.cwd() first so the files are found when the
+// function is bundled on Vercel (includeFiles land in the function root).
+function firstExisting(candidates) {
+  return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0];
+}
+
+const INITIAL_PATH = firstExisting([
+  resolve(process.cwd(), "initial.json"),
+  resolve(PROJECT_ROOT, "initial.json"),
+]);
+const CUSTOMERS_PATH = firstExisting([
+  resolve(process.cwd(), "server", "seed", "customers.json"),
+  resolve(PROJECT_ROOT, "server", "seed", "customers.json"),
+]);
 
 const REVIEW = "review replacement";
 const MEASUREMENT_MISSING = "measurement missing";

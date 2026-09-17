@@ -1,18 +1,19 @@
 import { useState } from "react";
 import type { ContactChannel, DerivedCase } from "../engine/types";
 import type { ContactMessageRow } from "../data/api";
-import { heroHeadline, stockLine } from "../engine/workflow";
+import { heroHeadline } from "../engine/workflow";
 import { hintFor } from "../copilot/answers";
 import { CaseOverview } from "./CaseOverview";
 import { ContactHub } from "./ContactHub";
+import { EvidenceExplorer } from "./EvidenceExplorer";
 import { Icon } from "./Icon";
 import { ValidationTimeline } from "./ValidationTimeline";
+import { VerifyStockCard } from "./VerifyStockCard";
 import { stateBadge } from "./status";
 
 type Props = {
   item: DerivedCase;
   rules: string[];
-  stockEvent: boolean;
   contactMessages: ContactMessageRow[];
   onApprove: () => void;
   onReject: (reason: string) => void;
@@ -22,12 +23,12 @@ type Props = {
   onCreateReviewTask: (note: string) => void;
   onContactGenerate: (channel: ContactChannel, body: string) => void;
   onContactMarkSimulated: (channel: ContactChannel) => void;
+  onContactSend: (channel: ContactChannel, body: string) => void | Promise<unknown>;
 };
 
 export function CaseWorkspace({
   item,
   rules,
-  stockEvent,
   contactMessages,
   onApprove,
   onReject,
@@ -37,6 +38,7 @@ export function CaseWorkspace({
   onCreateReviewTask,
   onContactGenerate,
   onContactMarkSimulated,
+  onContactSend,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [rejecting, setRejecting] = useState(false);
@@ -61,7 +63,6 @@ export function CaseWorkspace({
 
   const badge = stateBadge(item);
   const hint = hintFor(item);
-  const stock = stockLine(item);
 
   function startEdit() {
     setQuantity(item.runtime.quantity ?? 1);
@@ -259,69 +260,6 @@ export function CaseWorkspace({
     </>
   );
 
-  const stockContent = item.noAction ? (
-    <p className="vstep-idle">No offer — no stock to verify.</p>
-  ) : item.blocked ? (
-    <p className="vstep-idle">
-      <Icon name="lock" size={18} />
-      Locked until the missing evidence is collected.
-    </p>
-  ) : !item.runtime.approved ? (
-    <p className="vstep-idle">
-      <Icon name="lock" size={18} />
-      Locked until the proposal is approved.
-    </p>
-  ) : (
-    <>
-      <ul className="stock-facts">
-        <li>
-          <span>Size</span>
-          <strong>{item.stock ? item.stock.size : item.runtime.size ?? "—"}</strong>
-        </li>
-        <li>
-          <span>Units</span>
-          <strong>{item.stock ? item.stock.units : "—"}</strong>
-        </li>
-        <li>
-          <span>Status</span>
-          <strong>
-            {item.stock
-              ? item.stock.confirmed
-                ? "Confirmed"
-                : "Reported — not confirmed"
-              : "No matching record"}
-          </strong>
-        </li>
-      </ul>
-      {stockEvent ? (
-        <em className="sim-note">SIMULATED STOCK EVENT — not a live inventory system</em>
-      ) : null}
-      {item.stock && !item.stock.confirmed ? (
-        <div className="action-row">
-          <button type="button" className="btn btn-primary" onClick={onSimulateStock}>
-            <Icon name="cube" size={18} />
-            Simulate stock confirmation
-          </button>
-          <button type="button" className="btn" onClick={onBackToReview}>
-            <Icon name="redo" size={18} />
-            Back to review
-          </button>
-          <span className="action-hint sim">SIMULATED — not a live inventory system.</span>
-        </div>
-      ) : item.stock && item.stock.confirmed ? (
-        <p className="vstep-idle">
-          <Icon name="check" size={18} />
-          {stock}
-        </p>
-      ) : (
-        <p className="vstep-idle">
-          <Icon name="alert" size={18} />
-          No matching stock record in the supplied data.
-        </p>
-      )}
-    </>
-  );
-
   const contactContent = (
     <>
       {item.contactLock ? (
@@ -336,6 +274,7 @@ export function CaseWorkspace({
         messages={contactMessages}
         onGenerate={onContactGenerate}
         onMarkSimulated={onContactMarkSimulated}
+        onSend={onContactSend}
       />
     </>
   );
@@ -372,6 +311,8 @@ export function CaseWorkspace({
             <span>{heroHeadline(item)}</span>
           )}
         </h2>
+
+        <EvidenceExplorer item={item} />
       </section>
 
       <CaseOverview item={item} rules={rules} />
@@ -379,7 +320,13 @@ export function CaseWorkspace({
       <ValidationTimeline
         item={item}
         approve={approveContent}
-        stock={stockContent}
+        stock={
+          <VerifyStockCard
+            item={item}
+            onSimulateStock={onSimulateStock}
+            onBackToReview={onBackToReview}
+          />
+        }
         contact={contactContent}
       />
     </article>

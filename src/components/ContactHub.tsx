@@ -14,6 +14,7 @@ type Props = {
   messages: ContactMessageRow[];
   onGenerate: (channel: ContactChannel, body: string) => void;
   onMarkSimulated: (channel: ContactChannel) => void;
+  onSend: (channel: ContactChannel, body: string) => void | Promise<unknown>;
   embedded?: boolean;
 };
 
@@ -54,7 +55,14 @@ function channelHref(channel: ContactChannel, value: string): string {
   }
 }
 
-export function ContactHub({ item, messages, onGenerate, onMarkSimulated, embedded }: Props) {
+export function ContactHub({
+  item,
+  messages,
+  onGenerate,
+  onMarkSimulated,
+  onSend,
+  embedded,
+}: Props) {
   const [selected, setSelected] = useState<ContactChannel | null>(null);
 
   useEffect(() => {
@@ -72,15 +80,14 @@ export function ContactHub({ item, messages, onGenerate, onMarkSimulated, embedd
 
   return (
     <section className={`contact-hub${embedded ? " is-embedded" : ""}`} id="contact">
-      <div className="contact-head">
-        {embedded ? null : (
+      {embedded ? null : (
+        <div className="contact-head">
           <h3>
             <Icon name="person" size={18} />
             Contact hub
           </h3>
-        )}
-        <span className="chip">Simulated</span>
-      </div>
+        </div>
+      )}
 
       <div className="contact-identity">
         <div>
@@ -147,6 +154,7 @@ export function ContactHub({ item, messages, onGenerate, onMarkSimulated, embedd
               message={selectedMessage}
               onGenerate={(body) => onGenerate(selected, body)}
               onMarkSimulated={() => onMarkSimulated(selected)}
+              onSend={(body) => onSend(selected, body)}
             />
           ) : null}
         </>

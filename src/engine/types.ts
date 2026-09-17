@@ -148,6 +148,12 @@ export type QueueGroupView = {
   cases: DerivedCase[];
 };
 
+export type CaseTask = {
+  case: DerivedCase;
+  note: string;
+  createdAt: number;
+};
+
 export type InsightTone = "urgent" | "bad" | "warn" | "action" | "ok" | "muted";
 
 export type InsightIcon = "alert" | "clock" | "tyre" | "cube" | "mail" | "info" | "check";

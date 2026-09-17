@@ -1,6 +1,7 @@
 import { getDatabase, inTransaction } from "./db.mjs";
 import { seedDatabase, seedIfEmpty } from "./seed.mjs";
 import * as repo from "./repository.mjs";
+import { mailerConfig, sendEmail } from "./mailer.mjs";
 
 const REVIEW = "review replacement";
 const MEASUREMENT_MISSING = "measurement missing";
@@ -8,12 +9,22 @@ const SIZE_UNKNOWN = "unknown";
 const CONTACT_MISSING = "missing";
 
 const CHANNELS = ["whatsapp", "email", "phone", "sms"];
+const MESSAGE_CHANNELS = ["whatsapp", "email", "sms"];
 
 export class GateError extends Error {
   constructor(reason) {
     super(reason);
     this.name = "GateError";
     this.gatedReason = reason;
+  }
+}
+
+export class DeliveryError extends Error {
+  constructor(reason, messageId = null) {
+    super(reason);
+    this.name = "DeliveryError";
+    this.reason = reason;
+    this.messageId = messageId;
   }
 }
 
@@ -53,6 +64,17 @@ function channelLabel(channel) {
     default:
       return channel;
   }
+}
+
+function defaultContactSubject(offer) {
+  return `Tyre replacement offer — ${offer?.tyre_size ?? "your vehicle"}`;
+}
+
+function defaultContactBody(offer, customer) {
+  const quantity = offer?.quantity ?? "the agreed";
+  const size = offer?.tyre_size ?? "tyre";
+  const name = customer?.display_name ? ` ${customer.display_name}` : "";
+  return `Hello${name}, based on the inspection, your vehicle has an approved tyre replacement for ${quantity} × ${size}. Please contact us to arrange the appointment.`;
 }
 
 function mapCustomer(row) {
@@ -473,6 +495,147 @@ export function createStore(db) {
     return { messageId: draft.id, workspace: getWorkspace() };
   }
 
+  function channelDestination(customer, channel) {
+    switch (channel) {
+      case "email":
+        return customer?.email ?? null;
+      case "whatsapp":
+        return customer?.whatsapp ?? null;
+      case "sms":
+        return customer?.phone ?? customer?.whatsapp ?? null;
+      default:
+        return null;
+    }
+  }
+
+  async function sendContact(wheelSetId, channel, body, actor = "Coordinator") {
+    const normalized = String(channel || "email").toLowerCase();
+    if (!CHANNELS.includes(normalized)) throw new Error(`Unsupported channel: ${channel}`);
+    if (!MESSAGE_CHANNELS.includes(normalized)) {
+      throw new DeliveryError("Call is not a message channel — use the manual Call link instead.");
+    }
+
+    const gate = contactGate(wheelSetId, normalized);
+    if (gate) throw new GateError(gate);
+
+    const wheel = repo.getWheelSet(db, wheelSetId);
+    const customer = repo.getCustomer(db, wheel.customer_id);
+    const offer = repo.getOfferByWheel(db, wheelSetId);
+    const to = channelDestination(customer, normalized);
+    const text = body && String(body).trim() ? String(body) : defaultContactBody(offer, customer);
+
+    // Email uses Resend when configured; every other channel (and email without
+    // credentials) goes through the in-process mock provider.
+    const config = mailerConfig();
+    const useResend = normalized === "email" && config.configured;
+
+    let provider = "mock";
+    let providerMessageId = `mock_${normalized}_${Date.now().toString(36)}`;
+
+    if (useResend) {
+      provider = "resend";
+      try {
+        const delivery = await sendEmail({
+          to,
+          subject: defaultContactSubject(offer),
+          text,
+          ...config,
+        });
+        providerMessageId = delivery.id;
+      } catch (error) {
+        const createdAt = nowIso();
+        const messageId = repo.insertContactMessage(db, {
+          wheelSetId,
+          channel: normalized,
+          body: text,
+          status: "send_failed",
+          createdAt,
+        });
+        insertEvent(wheelSetId, "contact_send_failed", "human", {
+          label: `Email send failed: ${String(error?.message ?? error)}`,
+          channel: normalized,
+        }, createdAt);
+        repo.insertAudit(db, {
+          wheelSetId,
+          actor,
+          action: "contact_send_failed",
+          detail: `Email send to ${to} failed: ${String(error?.message ?? error)}`,
+          createdAt,
+        });
+        throw new DeliveryError(`Email could not be sent: ${String(error?.message ?? error)}`, messageId);
+      }
+    }
+
+    const sentAt = nowIso();
+    const status = provider === "resend" ? "sent" : "mock_sent";
+    const messageId = repo.insertContactMessage(db, {
+      wheelSetId,
+      channel: normalized,
+      body: text,
+      status,
+      createdAt: sentAt,
+    });
+    const destination = to ?? "recorded contact";
+    insertEvent(wheelSetId, "contact_sent", provider === "resend" ? "human" : "simulated", {
+      label:
+        provider === "resend"
+          ? `${channelLabel(normalized)} sent to ${destination}.`
+          : `MOCK ${channelLabel(normalized)} message recorded as sent — no external provider configured.`,
+      channel: normalized,
+      provider,
+      providerMessageId,
+      destination: to,
+    }, sentAt);
+    repo.insertAudit(db, {
+      wheelSetId,
+      actor,
+      action: "contact_sent",
+      detail:
+        provider === "resend"
+          ? `${channelLabel(normalized)} sent to ${destination} via Resend (${providerMessageId}).`
+          : `${channelLabel(normalized)} auto-sent via MOCK provider (no external delivery) to ${destination}.`,
+      createdAt: sentAt,
+    });
+    return { messageId, provider, providerMessageId, workspace: getWorkspace() };
+  }
+
+  function applyDeliveryEvent(providerMessageId, status, type, actor = "Resend webhook") {
+    if (!providerMessageId || !status) return { applied: false, reason: "unhandled-event" };
+
+    const sentEvent = repo
+      .listEvents(db)
+      .map(mapEvent)
+      .reverse()
+      .find(
+        (event) =>
+          event.eventType === "contact_sent" &&
+          event.payload?.providerMessageId === providerMessageId,
+      );
+    if (!sentEvent) return { applied: false, reason: "unknown-message" };
+
+    const message = repo
+      .listContactMessagesByWheel(db, sentEvent.wheelSetId)
+      .reverse()
+      .find((row) => row.status === "sent");
+    if (!message) return { applied: false, reason: "no-sent-message" };
+
+    const createdAt = nowIso();
+    repo.updateContactMessageStatus(db, message.id, status);
+    insertEvent(sentEvent.wheelSetId, `contact_${status}`, "source", {
+      label: `Email ${status} (provider event: ${type}).`,
+      channel: "email",
+      providerMessageId,
+    }, createdAt);
+    repo.insertAudit(db, {
+      wheelSetId: sentEvent.wheelSetId,
+      actor,
+      action: `contact_${status}`,
+      detail: `Resend reported ${type} for message ${providerMessageId}.`,
+      createdAt,
+    });
+    return { applied: true, messageId: message.id, status, workspace: getWorkspace() };
+  }
+
   function reset() {
     seedDatabase(db);
     return getWorkspace();
@@ -490,6 +653,8 @@ export function createStore(db) {
     simulateStock,
     draftContact,
     markContactSimulated,
+    sendContact,
+    applyDeliveryEvent,
     getContactGate: contactGate,
     reset,
     availableChannels,

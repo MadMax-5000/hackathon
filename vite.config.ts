@@ -110,8 +110,15 @@ function deepseekProxy(env: Record<string, string>): Plugin {
 
 function c03Database(env: Record<string, string>): Plugin {
   const handler = () => {
-    if (env.C03_DB_PATH && !process.env.C03_DB_PATH) {
-      process.env.C03_DB_PATH = env.C03_DB_PATH;
+    for (const key of [
+      "C03_DB_PATH",
+      "RESEND_API_KEY",
+      "RESEND_FROM",
+      "RESEND_FROM_EMAIL",
+      "RESEND_REPLY_TO",
+      "RESEND_WEBHOOK_SECRET",
+    ]) {
+      if (env[key] && !process.env[key]) process.env[key] = env[key];
     }
     return createApiMiddleware() as never;
   };

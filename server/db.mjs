@@ -7,7 +7,10 @@ import { SCHEMA_SQL } from "./schema.mjs";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export const PROJECT_ROOT = resolve(__dirname, "..");
-export const DEFAULT_DB_PATH = resolve(PROJECT_ROOT, "data", "c03.sqlite");
+// Serverless filesystems are read-only except for /tmp.
+export const DEFAULT_DB_PATH = process.env.VERCEL
+  ? "/tmp/c03.sqlite"
+  : resolve(PROJECT_ROOT, "data", "c03.sqlite");
 
 let singleton = null;
 

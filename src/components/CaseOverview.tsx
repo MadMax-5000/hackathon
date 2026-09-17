@@ -59,7 +59,6 @@ export function CaseOverview({ item, rules }: Props) {
           Case brief
         </span>
         <span className="overview-tools">
-          <span className="chip">AI</span>
           <button
             type="button"
             className="queue-icon-btn"

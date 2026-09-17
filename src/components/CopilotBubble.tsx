@@ -84,7 +84,6 @@ export function CopilotBubble({ item, rules }: Props) {
               Coordinator Copilot
             </h3>
             <div className="chat-head-actions">
-              <span className="chat-tag">AI</span>
               <button
                 type="button"
                 className="chat-close"
@@ -95,10 +94,6 @@ export function CopilotBubble({ item, rules }: Props) {
               </button>
             </div>
           </header>
-
-          <p className="chat-note">
-            Synthetic data. Answers use only this case and the supplied rules.
-          </p>
 
           <div className="chat-thread">
             {messages.length === 0 ? (

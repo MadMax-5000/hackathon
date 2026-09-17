@@ -1,4 +1,5 @@
-import { getStore, GateError } from "./service.mjs";
+import { getStore, GateError, DeliveryError } from "./service.mjs";
+import { verifyResendSignature, mapResendEvent } from "./webhooks.mjs";
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -48,6 +49,34 @@ export function createApiMiddleware(store = getStore()) {
 
       if (method === "POST" && segments.length === 1 && segments[0] === "reset") {
         send(res, 200, store.reset());
+        return;
+      }
+
+      if (
+        method === "POST" &&
+        segments.length === 2 &&
+        segments[0] === "webhooks" &&
+        segments[1] === "resend"
+      ) {
+        const raw = await readBody(req);
+        const verdict = verifyResendSignature(
+          raw,
+          req.headers ?? {},
+          process.env.RESEND_WEBHOOK_SECRET || "",
+        );
+        if (!verdict.ok) {
+          send(res, 401, { error: "invalid-signature", reason: verdict.reason });
+          return;
+        }
+        let payload = {};
+        try {
+          payload = JSON.parse(raw);
+        } catch {
+          send(res, 400, { error: "bad-json" });
+          return;
+        }
+        const event = mapResendEvent(payload);
+        send(res, 200, store.applyDeliveryEvent(event.providerMessageId, event.status, event.type));
         return;
       }
 
@@ -102,6 +131,16 @@ export function createApiMiddleware(store = getStore()) {
               send(res, 200, result);
               return;
             }
+            if (sub === "send") {
+              const result = await store.sendContact(
+                wheelSetId,
+                body.channel,
+                body.body,
+                body.actor,
+              );
+              send(res, 200, result);
+              return;
+            }
             break;
           default:
             break;
@@ -116,6 +155,10 @@ export function createApiMiddleware(store = getStore()) {
     } catch (error) {
       if (error instanceof GateError) {
         send(res, 409, { error: "gated", reason: error.gatedReason });
+        return;
+      }
+      if (error instanceof DeliveryError) {
+        send(res, 502, { error: "delivery-failed", reason: error.reason });
         return;
       }
       send(res, 500, { error: "server-error", detail: String(error?.message ?? error) });

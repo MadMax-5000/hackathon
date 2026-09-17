@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "db:seed": "node --experimental-strip-types scripts/db-cli.mjs seed",
     "db:reset": "node --experimental-strip-types scripts/db-cli.mjs reset",
-    "verify": "node --experimental-strip-types scripts/verify-isolation.mjs && node --experimental-strip-types scripts/verify-copilot.mjs && node --experimental-strip-types scripts/verify-deepseek.mjs && node --experimental-strip-types scripts/verify-gating.mjs && node --experimental-strip-types scripts/verify-queue.mjs && node --experimental-strip-types scripts/verify-timeline.mjs && node --experimental-strip-types scripts/verify-overview.mjs && node --experimental-strip-types scripts/verify-db.mjs && node --experimental-strip-types scripts/verify-contacts.mjs && node --experimental-strip-types scripts/verify-contact-gating.mjs && node --experimental-strip-types scripts/verify-audit.mjs"
+    "verify": "node --experimental-strip-types scripts/verify-isolation.mjs && node --experimental-strip-types scripts/verify-copilot.mjs && node --experimental-strip-types scripts/verify-deepseek.mjs && node --experimental-strip-types scripts/verify-gating.mjs && node --experimental-strip-types scripts/verify-queue.mjs && node --experimental-strip-types scripts/verify-timeline.mjs && node --experimental-strip-types scripts/verify-overview.mjs && node --experimental-strip-types scripts/verify-db.mjs && node --experimental-strip-types scripts/verify-contacts.mjs && node --experimental-strip-types scripts/verify-contact-gating.mjs && node --experimental-strip-types scripts/verify-contact-send.mjs && node --experimental-strip-types scripts/verify-audit.mjs && node --experimental-strip-types scripts/verify-insights.mjs"
   },
   "dependencies": {
     "@hugeicons/core-free-icons": "^4.3.3",
@@ -23,5 +23,8 @@
     "@vitejs/plugin-react": "^5.0.2",
     "typescript": "^5.9.2",
     "vite": "^7.1.5"
+  },
+  "engines": {
+    "node": "22.x"
   }
 }
