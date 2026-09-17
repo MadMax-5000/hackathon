@@ -1,0 +1,27 @@
+{
+  "name": "c03-inspection-offer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "db:seed": "node --experimental-strip-types scripts/db-cli.mjs seed",
+    "db:reset": "node --experimental-strip-types scripts/db-cli.mjs reset",
+    "verify": "node --experimental-strip-types scripts/verify-isolation.mjs && node --experimental-strip-types scripts/verify-copilot.mjs && node --experimental-strip-types scripts/verify-deepseek.mjs && node --experimental-strip-types scripts/verify-gating.mjs && node --experimental-strip-types scripts/verify-queue.mjs && node --experimental-strip-types scripts/verify-timeline.mjs && node --experimental-strip-types scripts/verify-overview.mjs && node --experimental-strip-types scripts/verify-db.mjs && node --experimental-strip-types scripts/verify-contacts.mjs && node --experimental-strip-types scripts/verify-contact-gating.mjs && node --experimental-strip-types scripts/verify-audit.mjs"
+  },
+  "dependencies": {
+    "@hugeicons/core-free-icons": "^4.3.3",
+    "@hugeicons/react": "^1.1.10",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.2",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5"
+  }
+}

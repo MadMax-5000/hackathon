@@ -1,0 +1,62 @@
+{
+  "case_id": "C03",
+  "data_status": "SYNTHETIC EXERCISE DATA; not real client, country, programme or participant data",
+  "clock": "Exercise-local time only; no real event date implied",
+  "wheel_sets": [
+    {
+      "id": "TY-1",
+      "customer_id": "CUS-1",
+      "front": "review replacement",
+      "rear": "no concern recorded",
+      "size": "205/55 R16",
+      "appointment": "Day 5",
+      "contact": "available"
+    },
+    {
+      "id": "TY-2",
+      "customer_id": "CUS-2",
+      "front": "measurement missing",
+      "rear": "no concern recorded",
+      "size": "unknown",
+      "appointment": "Day 6",
+      "contact": "missing"
+    },
+    {
+      "id": "TY-3",
+      "customer_id": "CUS-3",
+      "front": "review replacement",
+      "rear": "review replacement",
+      "size": "225/45 R17",
+      "appointment": "Day 4",
+      "contact": "available"
+    },
+    {
+      "id": "TY-4",
+      "customer_id": "CUS-4",
+      "front": "no concern recorded",
+      "rear": "no concern recorded",
+      "size": "205/55 R16",
+      "appointment": "Day 7",
+      "contact": "available"
+    }
+  ],
+  "availability": [
+    {
+      "id": "ST-1",
+      "size": "205/55 R16",
+      "units": 2,
+      "confirmed": true
+    },
+    {
+      "id": "ST-2",
+      "size": "225/45 R17",
+      "units": 4,
+      "confirmed": false
+    }
+  ],
+  "rules": [
+    "A technician approves fitment and required quantity.",
+    "Unknown measurements create a review task.",
+    "Only approved offers may become customer messages."
+  ]
+}

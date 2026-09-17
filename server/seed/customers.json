@@ -1,0 +1,53 @@
+{
+  "data_status": "SYNTHETIC EXERCISE DATA — reserved example values only; not real people or contact details",
+  "customers": [
+    {
+      "id": "CUS-1",
+      "display_name": "Synthetic Customer One",
+      "phone": "+00 555 0101",
+      "whatsapp": "+00 555 0101",
+      "email": "cus-1@example.invalid",
+      "sms_available": false,
+      "phone_available": true,
+      "whatsapp_available": true,
+      "email_available": true,
+      "preferred_channel": "whatsapp"
+    },
+    {
+      "id": "CUS-2",
+      "display_name": "Synthetic Customer Two",
+      "phone": null,
+      "whatsapp": null,
+      "email": null,
+      "sms_available": false,
+      "phone_available": false,
+      "whatsapp_available": false,
+      "email_available": false,
+      "preferred_channel": null
+    },
+    {
+      "id": "CUS-3",
+      "display_name": "Synthetic Customer Three",
+      "phone": "+00 555 0103",
+      "whatsapp": "+00 555 0103",
+      "email": "cus-3@example.invalid",
+      "sms_available": true,
+      "phone_available": true,
+      "whatsapp_available": true,
+      "email_available": true,
+      "preferred_channel": "whatsapp"
+    },
+    {
+      "id": "CUS-4",
+      "display_name": "Synthetic Customer Four",
+      "phone": "+00 555 0104",
+      "whatsapp": null,
+      "email": "cus-4@example.invalid",
+      "sms_available": false,
+      "phone_available": true,
+      "whatsapp_available": false,
+      "email_available": true,
+      "preferred_channel": "email"
+    }
+  ]
+}
